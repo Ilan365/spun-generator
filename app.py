@@ -5,17 +5,16 @@ import streamlit as st
 from docx.api import Document
 import openpyxl
 from io import BytesIO
-import numpy as np
 
 class SpunGenerator:
     def __init__(self):
         self.variable_pattern = r'\$(\w+)'
 
     def replace_variables(self, text, variables_dict):
-        """Remplace les variables par leurs valeurs (texte brut, gère les vides)"""
+        """Remplace les variables par leurs valeurs (affiche tout sauf les vides réels)"""
         for var, value in variables_dict.items():
-            # Toujours traiter comme du texte brut
-            if value is None or str(value).lower() in ['nan', 'none']:
+            # Considère comme vide uniquement None, nan, none, ou chaîne vide
+            if value is None or str(value).strip() == '' or str(value).lower() in ['nan', 'none']:
                 value = ''
             else:
                 value = str(value)
