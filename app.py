@@ -6,34 +6,33 @@ from docx.api import Document
 import openpyxl
 from io import BytesIO
 
-# Liste des variantes de code postal à traiter spécifiquement
-CODE_POSTAL_VARIANTS = ['code_postal', 'codepostal', 'codepostal', 'codePostal', 'CodePostal']
-
 class SpunGenerator:
     def __init__(self):
         self.variable_pattern = r'\$(\w+)'
 
     def replace_variables(self, text, variables_dict):
-        """Remplace les variables avec gestion avancée des codes postaux"""
+        """Remplace les variables de type $var"""
         for var, value in variables_dict.items():
-            if var in CODE_POSTAL_VARIANTS or var.lower() in [v.lower() for v in CODE_POSTAL_VARIANTS]:
-                if pd.isna(value) or value == '':
+            # Gestion spécifique des codes postaux
+            if var.lower() in ['codepostal', 'code_postal', 'codeposte']:
+                if pd.isna(value) or value in ['', 'nan']:
                     value = ''
                 else:
-                    # Conversion en texte brut avec zéros initiaux
-                    if isinstance(value, float):
-                        value = f"{int(value):05d}"
-                    else:
+                    # Conversion float => int si nécessaire, puis format 5 chiffres
+                    try:
+                        value = f"{int(float(value)):05d}"
+                    except:
                         value = str(value).zfill(5)
+            # Pour toutes les autres variables
             else:
-                # Comportement natif pour les autres variables
-                if pd.isna(value) or value == '':
+                if pd.isna(value) or value in ['', 'nan']:
                     value = ''
                 else:
+                    # Conversion float => int si entier
                     if isinstance(value, float) and value.is_integer():
                         value = int(value)
                     value = str(value)
-            text = text.replace(f'${var}$', value)
+            text = text.replace(f'${var}', value)
         return text
 
     def choose_option(self, options):
@@ -123,15 +122,7 @@ def generate_spuns(input_text, df_variables, num_spuns):
     for index, row in df_variables.iterrows():
         if index >= num_spuns:
             break
-        variables_dict = {}
-        for col in df_variables.columns:
-            if col in CODE_POSTAL_VARIANTS or col.lower() in [v.lower() for v in CODE_POSTAL_VARIANTS]:
-                variables_dict[col] = str(row[col]).zfill(5) if not pd.isna(row[col]) and row[col] != '' else ''
-            else:
-                val = row[col]
-                if isinstance(val, float) and val.is_integer():
-                    val = int(val)
-                variables_dict[col] = '' if pd.isna(val) or val == '' else str(val)
+        variables_dict = row.to_dict()
         spun_text = generator.generate_spun(input_text, variables_dict)
         spun_text = spun_text.replace('###devider###', '###devider###\n')
         results.append([index + 1, spun_text])
@@ -146,12 +137,7 @@ def create_streamlit_app():
     if st.button("Générer les spuns") and text_file and excel_file:
         try:
             with st.spinner('Génération des spuns en cours...'):
-                # Lecture du fichier avec gestion des codes postaux
-                df_variables = pd.read_excel(
-                    excel_file,
-                    dtype={v: str for v in CODE_POSTAL_VARIANTS},
-                    keep_default_na=False
-                )
+                df_variables = pd.read_excel(excel_file, dtype={'codePostal': str})
                 input_text = process_input_file(text_file)
                 df_results = generate_spuns(input_text, df_variables, num_spuns)
                 st.subheader("Prévisualisation des spuns générés")
