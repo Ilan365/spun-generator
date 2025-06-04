@@ -14,7 +14,7 @@ class SpunGenerator:
         """Remplace les variables avec gestion avancée des codes postaux"""
         for var, value in variables_dict.items():
             # Gestion spéciale pour toutes les variantes de code postal
-            if var.lower() in ['codepostal', 'code_postal', 'codeposte']:
+            if var.lower() in ['codepostal', 'code_postal', 'codepostal']:
                 if pd.isna(value) or value == '':
                     value = ''
                 else:
@@ -35,7 +35,102 @@ class SpunGenerator:
             text = text.replace(f'${var}$', value)
         return text
 
-    # ... (le reste des méthodes de la classe reste inchangé) ...
+    def choose_option(self, options):
+        """Choisit une option aléatoire"""
+        return random.choice(options) if options else ''
+
+    def find_matching_brace(self, text, start):
+        """Trouve l'accolade fermante correspondante"""
+        count = 1
+        pos = start + 1
+        while count > 0 and pos < len(text):
+            if text[pos] == '{':
+                count += 1
+            elif text[pos] == '}':
+                count -= 1
+            pos += 1
+        return pos if count == 0 else -1
+
+    def process_simple_options(self, text):
+        """Règle 1: Traite les options simples {opt1|opt2}"""
+        while True:
+            match = re.search(r'{([^{}]+)}', text)
+            if not match:
+                break
+            
+            options = [opt.strip() for opt in match.group(1).split('|')]
+            chosen = self.choose_option(options)
+            text = text[:match.start()] + chosen + text[match.end():]
+        
+        return text
+
+    def process_paragraph_options(self, text):
+        """Règle 3: Traite les options de paragraphe {{para1|para2}}"""
+        def split_options(content):
+            """Sépare les options de paragraphe en gérant les imbrications"""
+            options = []
+            current = ''
+            depth = 0
+            
+            for char in content + '|':
+                if char == '{':
+                    depth += 1
+                elif char == '}':
+                    depth -= 1
+                
+                if char == '|' and depth == 0:
+                    if current.strip():  # Ne garde que les options non vides
+                        options.append(current.strip())
+                    current = ''
+                else:
+                    current += char
+                    
+            if current.strip():  # Ajoute la dernière option si non vide
+                options.append(current.strip())
+            return options
+
+        result = text
+        pattern = r'\{\{([^{}]|{[^{}]*})*\}\}'
+        
+        while True:
+            match = re.search(pattern, result, re.DOTALL)
+            if not match:
+                break
+            
+            full_match = match.group(0)
+            content = full_match[2:-2]
+            
+            options = split_options(content)
+            if options:
+                chosen = self.choose_option(options)
+                processed = self.process_simple_options(chosen)
+                result = result[:match.start()] + processed + result[match.end():]
+            else:
+                result = result[:match.start()] + content + result[match.end():]
+        
+        return result
+
+    def generate_spun(self, text, variables_dict):
+        """Génère un spun complet en appliquant les règles dans l'ordre"""
+        text = self.process_paragraph_options(text)
+        text = self.process_simple_options(text)
+        text = self.replace_variables(text, variables_dict)
+        return text
+
+def process_input_file(file_bytes):
+    """Traite le fichier d'entrée (txt ou docx)"""
+    try:
+        if file_bytes.name.endswith('.docx'):
+            doc = Document(BytesIO(file_bytes.read()))
+            return '\n'.join([paragraph.text for paragraph in doc.paragraphs])
+        else:  # txt
+            content = file_bytes.read()
+            if isinstance(content, bytes):
+                return content.decode('utf-8')
+            return content
+    except Exception as e:
+        st.error(f"Erreur lors de la lecture du fichier: {str(e)}")
+        raise
 
 def generate_spuns(input_text, df_variables, num_spuns):
     """Génère les spuns avec gestion des types de colonnes"""
@@ -50,7 +145,7 @@ def generate_spuns(input_text, df_variables, num_spuns):
         variables_dict = {}
         for col in df_variables.columns:
             col_lower = col.lower()
-            if col_lower in ['codepostal', 'code_postal', 'codeposte']:
+            if col_lower in ['codepostal', 'code_postal', 'codepostal']:
                 variables_dict[col] = str(row[col]).zfill(5) if not pd.isna(row[col]) else ''
             else:
                 val = row[col]
@@ -122,9 +217,3 @@ def create_streamlit_app():
                         file_name="spuns.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
-        
-        except Exception as e:
-            st.error(f"Erreur critique : {str(e)}")
-
-if __name__ == "__main__":
-    create_streamlit_app()
