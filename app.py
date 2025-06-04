@@ -14,7 +14,7 @@ class SpunGenerator:
         """Remplace les variables avec gestion avancée des codes postaux"""
         for var, value in variables_dict.items():
             # Gestion spéciale pour toutes les variantes de code postal
-            if var.lower() in ['codepostal', 'code_postal', 'codepostal']:
+            if var.lower() in ['codepostal', 'code_postal', 'codepostal', 'codepostal']:
                 if pd.isna(value) or value == '':
                     value = ''
                 else:
@@ -145,7 +145,7 @@ def generate_spuns(input_text, df_variables, num_spuns):
         variables_dict = {}
         for col in df_variables.columns:
             col_lower = col.lower()
-            if col_lower in ['codepostal', 'code_postal', 'codepostal']:
+            if col_lower in ['codepostal', 'code_postal', 'codepostal', 'codepostal']:
                 variables_dict[col] = str(row[col]).zfill(5) if not pd.isna(row[col]) else ''
             else:
                 val = row[col]
@@ -217,3 +217,8 @@ def create_streamlit_app():
                         file_name="spuns.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
+        except Exception as e:
+            st.error(f"Erreur critique : {str(e)}")
+
+if __name__ == "__main__":
+    create_streamlit_app()
