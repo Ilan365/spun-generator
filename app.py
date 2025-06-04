@@ -2,7 +2,7 @@ import re
 import random
 import pandas as pd
 import streamlit as st
-from docx import Document
+from docx.api import Document
 import openpyxl
 from io import BytesIO
 
@@ -13,6 +13,9 @@ class SpunGenerator:
     def replace_variables(self, text, variables_dict):
         """Remplace les variables par leurs valeurs"""
         for var, value in variables_dict.items():
+            # Correction : conversion float entier en int pour éviter le .0
+            if isinstance(value, float) and value.is_integer():
+                value = int(value)
             if var in text:  # Vérifie si la variable existe dans le texte
                 text = text.replace(f'${var}', str(value) if value is not None else '')
         return text
@@ -164,14 +167,23 @@ def create_streamlit_app():
                             disabled=True
                         )
                 
-                # Création du fichier Excel pour le téléchargement
+                # Création des fichiers pour téléchargement
+                # CSV
+                csv_data = df_results.to_csv(index=False).encode('utf-8')
+                # Excel
                 output = BytesIO()
                 df_results.to_excel(output, index=False, engine='openpyxl')
                 output.seek(0)
                 
-                # Bouton de téléchargement
+                # Boutons de téléchargement
                 st.download_button(
-                    label="Télécharger tous les spuns générés",
+                    label="Télécharger tous les spuns en CSV",
+                    data=csv_data,
+                    file_name="spuns_generes.csv",
+                    mime="text/csv"
+                )
+                st.download_button(
+                    label="Télécharger tous les spuns en Excel",
                     data=output,
                     file_name="spuns_generes.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
