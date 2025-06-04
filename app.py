@@ -5,19 +5,21 @@ import streamlit as st
 from docx.api import Document
 import openpyxl
 from io import BytesIO
+import numpy as np
 
 class SpunGenerator:
     def __init__(self):
         self.variable_pattern = r'\$(\w+)'
 
     def replace_variables(self, text, variables_dict):
-        """Remplace les variables par leurs valeurs"""
+        """Remplace les variables par leurs valeurs (texte brut, gère les vides)"""
         for var, value in variables_dict.items():
-            # Correction : conversion float entier en int pour éviter le .0
-            if isinstance(value, float) and value.is_integer():
-                value = int(value)
-            if var in text:  # Vérifie si la variable existe dans le texte
-                text = text.replace(f'${var}', str(value) if value is not None else '')
+            # Toujours traiter comme du texte brut
+            if value is None or str(value).lower() in ['nan', 'none']:
+                value = ''
+            else:
+                value = str(value)
+            text = text.replace(f'${var}', value)
         return text
 
     def choose_option(self, options):
@@ -151,7 +153,7 @@ def create_streamlit_app():
             with st.spinner('Génération des spuns en cours...'):
                 # Lecture des fichiers
                 input_text = process_input_file(text_file)
-                df_variables = pd.read_excel(excel_file)
+                df_variables = pd.read_excel(excel_file, dtype=str)  # Force tout en texte
                 
                 # Génération des spuns
                 df_results = generate_spuns(input_text, df_variables, num_spuns)
