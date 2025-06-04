@@ -11,13 +11,27 @@ class SpunGenerator:
         self.variable_pattern = r'\$(\w+)'
 
     def replace_variables(self, text, variables_dict):
-        """Remplace les variables par leurs valeurs (affiche tout sauf les vides réels)"""
+        """Remplace les variables par leurs valeurs (texte brut, gère les vides, gère code postal)"""
         for var, value in variables_dict.items():
-            # Considère comme vide uniquement None, nan, none, ou chaîne vide
-            if value is None or str(value).strip() == '' or str(value).lower() in ['nan', 'none']:
-                value = ''
+            # Gestion code postal : afficher sans ".0" et conserver les zéros initiaux
+            if var.lower() in ['codepostal', 'code_postal']:
+                if value is not None and str(value).lower() not in ['nan', 'none', '#ref!', '']:
+                    # Gérer float affiché comme 75001.0 => "75001"
+                    try:
+                        # On convertit en int puis en str pour enlever ".0", puis on complète à 5 chiffres
+                        float_val = float(value)
+                        int_val = int(float_val)
+                        value = str(int_val).zfill(5)
+                    except Exception:
+                        value = str(value)
+                else:
+                    value = ''
             else:
-                value = str(value)
+                # Pour toutes les autres variables, on affiche la valeur sauf si vide/nan/none/#REF!
+                if value is None or str(value).strip() == '' or str(value).lower() in ['nan', 'none', '#ref!']:
+                    value = ''
+                else:
+                    value = str(value)
             text = text.replace(f'${var}', value)
         return text
 
